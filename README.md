@@ -1,4 +1,26 @@
- Atlas ERP API
+# Atlas ERP
+
+O repositório contém a aplicação original na raiz e um backend novo e independente em `backend/`. Os comandos e as instruções da aplicação original estão preservados abaixo.
+
+## Backend novo (`backend/`) — Java 21
+
+O backend novo usa Spring Boot, Maven, PostgreSQL e Flyway. Execute os comandos a partir de `backend/`:
+
+```powershell
+.\mvnw.cmd -B verify
+```
+
+`verify` executa os testes unitários e de integração. Os testes de integração usam PostgreSQL temporário via Testcontainers e requerem Docker em execução.
+
+Para construir a imagem Docker localmente, também a partir de `backend/`:
+
+```powershell
+docker build -t atlas-erp-backend .
+```
+
+A execução da aplicação requer configuração externa do datasource (`DATABASE_URL`, `DATABASE_USERNAME` e `DATABASE_PASSWORD`) e de `JWT_SECRET`. Não coloque credenciais reais em arquivos versionados. O bootstrap administrativo fica desabilitado por padrão; a configuração normal do Flyway usa somente `classpath:db/migration`.
+
+## Aplicação original na raiz — Java 17
 
 REST API for user management in an ERP system built with Java and Spring Boot.
 

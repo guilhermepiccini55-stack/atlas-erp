@@ -1,0 +1,37 @@
+#!/bin/sh
+# Maven Wrapper (script leve): baixa o Maven definido em .mvn/wrapper/maven-wrapper.properties
+# na primeira execução e repassa todos os argumentos para ele.
+set -eu
+
+BASE_DIR=$(cd "$(dirname "$0")" && pwd)
+PROPS="$BASE_DIR/.mvn/wrapper/maven-wrapper.properties"
+
+ZIP_URL=$(sed -n 's/^distributionUrl=//p' "$PROPS" | tr -d '\r')
+if [ -z "$ZIP_URL" ]; then
+  echo "distributionUrl não encontrado em $PROPS" >&2
+  exit 1
+fi
+
+URL=$(printf '%s' "$ZIP_URL" | sed 's/\.zip$/.tar.gz/')
+NAME=$(basename "$URL" -bin.tar.gz)
+HASH=$(printf '%s' "$URL" | cksum | cut -d' ' -f1)
+DIST_DIR="${MAVEN_USER_HOME:-$HOME/.m2}/wrapper/dists/$NAME/$HASH"
+MVN="$DIST_DIR/$NAME/bin/mvn"
+
+if [ ! -x "$MVN" ]; then
+  echo "Baixando Maven: $URL" >&2
+  mkdir -p "$DIST_DIR"
+  TMP="$DIST_DIR/$NAME-bin.tar.gz"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$URL" -o "$TMP"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q "$URL" -O "$TMP"
+  else
+    echo "Instale curl ou wget para baixar o Maven." >&2
+    exit 1
+  fi
+  tar -xzf "$TMP" -C "$DIST_DIR"
+  rm -f "$TMP"
+fi
+
+exec "$MVN" "$@"

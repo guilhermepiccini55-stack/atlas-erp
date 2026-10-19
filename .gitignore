@@ -1,8 +1,29 @@
 HELP.md
+
+# Environment files and local secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+.secrets/
+.credentials/
+secrets/
+credentials.json
+secrets*.json
+token*.json
+*-token.json
+*.token
+service-account*.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Maven / Java build output
 target/
-.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
+*.class
 
 ### STS ###
 .apt_generated
@@ -22,12 +43,37 @@ target/
 ### NetBeans ###
 /nbproject/private/
 /nbbuild/
-/dist/
 /nbdist/
 /.nb-gradle/
 build/
-!**/src/main/**/build/
-!**/src/test/**/build/
+dist/
+coverage/
 
 ### VS Code ###
 .vscode/
+
+# Frontend dependencies and generated output
+node_modules/
+.next/
+.nuxt/
+.svelte-kit/
+.angular/
+.vite/
+*.tsbuildinfo
+
+# Logs, caches, temporary files, and OS metadata
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+.cache/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+*.bak
+.DS_Store
+Thumbs.db
+Desktop.ini

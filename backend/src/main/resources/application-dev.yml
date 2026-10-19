@@ -1,0 +1,10 @@
+# Dev: o seed de demonstração não é aplicado por padrão.
+spring:
+  flyway:
+    locations: ${FLYWAY_LOCATIONS:classpath:db/migration}
+  jpa:
+    show-sql: false
+
+logging:
+  level:
+    com.atlas.erp: DEBUG
