@@ -2,7 +2,9 @@ package com.atlas.erp.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
 
+@Getter
 public class UpdateUserRequest {
 
     @NotBlank(message = "Name is required")
@@ -11,12 +13,4 @@ public class UpdateUserRequest {
     @Email(message = "Invalid email")
     @NotBlank(message = "Email is required")
     private String email;
-
-    public String getName() {
-        return name;
-    }
-
-    public String getEmail() {
-        return email;
-    }
 }

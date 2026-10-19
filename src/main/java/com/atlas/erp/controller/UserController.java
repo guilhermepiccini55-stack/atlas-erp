@@ -4,9 +4,7 @@ import com.atlas.erp.dto.CreateUserRequest;
 import com.atlas.erp.dto.UpdateUserRequest;
 import com.atlas.erp.dto.UserDTO;
 import com.atlas.erp.service.UserService;
-
 import jakarta.validation.Valid;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -39,17 +37,13 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-public UserDTO update(
-        @PathVariable Long id,
-        @Valid @RequestBody UpdateUserRequest request) {
+    public UserDTO update(@PathVariable Long id, @Valid @RequestBody UpdateUserRequest request) {
+        return userService.updateUser(id, request);
+    }
 
-    return userService.updateUser(id, request);
-}
-
-@DeleteMapping("/{id}")
-@ResponseStatus(HttpStatus.NO_CONTENT)
-public void delete(@PathVariable Long id) {
-    userService.deleteUser(id);
-}
-
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long id) {
+        userService.deleteUser(id);
+    }
 }
