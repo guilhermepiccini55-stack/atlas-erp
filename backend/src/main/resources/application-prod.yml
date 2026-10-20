@@ -3,6 +3,11 @@ spring:
   jpa:
     show-sql: false
 
+management:
+  health:
+    mail:
+      enabled: false
+
 logging:
   level:
     root: INFO
