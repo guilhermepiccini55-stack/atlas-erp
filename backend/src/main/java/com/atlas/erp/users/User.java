@@ -17,25 +17,32 @@ import org.hibernate.annotations.SQLRestriction;
 @SQLRestriction("deleted_at IS NULL")
 public class User extends BaseEntity {
 
-    @Column(nullable = false, length = 120)
+    @Column(nullable = false, length = 255)
     private String name;
 
-    @Column(nullable = false, length = 180)
+    @Column(nullable = false, length = 255)
     private String email;
 
-    @Column(name = "password_hash", nullable = false, length = 100)
+    @Column(name = "password", nullable = false, length = 255)
     private String passwordHash;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private Role role;
+    private Role role = Role.GUEST;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private UserStatus status = UserStatus.ACTIVE;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "credential_state", nullable = false, length = 30)
+    private CredentialState credentialState = CredentialState.BCRYPT;
+
     @Column(name = "deleted_at")
     private Instant deletedAt;
+
+    @Column(name = "credential_version", nullable = false)
+    private long credentialVersion;
 
     protected User() {
     }
@@ -46,6 +53,7 @@ public class User extends BaseEntity {
         this.passwordHash = passwordHash;
         this.role = role;
         this.status = status;
+        this.credentialState = CredentialState.BCRYPT;
     }
 
     public String getName() {
@@ -72,6 +80,14 @@ public class User extends BaseEntity {
         this.passwordHash = passwordHash;
     }
 
+    public CredentialState getCredentialState() {
+        return credentialState;
+    }
+
+    public void setCredentialState(CredentialState credentialState) {
+        this.credentialState = credentialState;
+    }
+
     public Role getRole() {
         return role;
     }
@@ -90,5 +106,13 @@ public class User extends BaseEntity {
 
     public Instant getDeletedAt() {
         return deletedAt;
+    }
+
+    public long getCredentialVersion() {
+        return credentialVersion;
+    }
+
+    public void incrementCredentialVersion() {
+        credentialVersion++;
     }
 }

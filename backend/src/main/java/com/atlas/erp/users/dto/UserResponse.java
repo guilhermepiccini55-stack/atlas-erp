@@ -2,11 +2,12 @@ package com.atlas.erp.users.dto;
 
 import com.atlas.erp.users.Role;
 import com.atlas.erp.users.UserStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
-import java.util.UUID;
 
 public record UserResponse(
-        UUID id,
+        @Schema(description = "ID numérico BIGINT do usuário")
+        Long id,
         String name,
         String email,
         Role role,

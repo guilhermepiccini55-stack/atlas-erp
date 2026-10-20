@@ -4,7 +4,7 @@ import com.atlas.erp.users.Role;
 import com.atlas.erp.users.UserRepository;
 import com.atlas.erp.users.UserService;
 import com.atlas.erp.users.UserStatus;
-import com.atlas.erp.users.dto.UserRequest;
+import com.atlas.erp.users.dto.UserCreateRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import java.util.Set;
@@ -42,8 +42,8 @@ public class AdminBootstrapService {
 
         requireConfiguration(name, email, password);
 
-        UserRequest request = new UserRequest(name, email, password, Role.ADMIN, UserStatus.ACTIVE);
-        Set<ConstraintViolation<UserRequest>> violations = validator.validate(request);
+        UserCreateRequest request = new UserCreateRequest(name, email, password, Role.ADMIN, UserStatus.ACTIVE);
+        Set<ConstraintViolation<UserCreateRequest>> violations = validator.validate(request);
         if (!violations.isEmpty()) {
             String details = violations.stream()
                     .map(violation -> violation.getPropertyPath() + ": " + violation.getMessage())

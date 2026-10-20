@@ -1,9 +1,10 @@
 package com.atlas.erp.security;
 
-import com.atlas.erp.users.User;
+import com.atlas.erp.users.CredentialState;
 import com.atlas.erp.users.UserRepository;
-import com.atlas.erp.users.UserStatus;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import com.atlas.erp.users.User;
+import java.util.regex.Pattern;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -11,6 +12,9 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
+
+    private static final Pattern BCRYPT_HASH =
+            Pattern.compile("^\\$2[aby]\\$\\d{2}\\$[./A-Za-z0-9]{53}$");
 
     private final UserRepository userRepository;
 
@@ -22,10 +26,10 @@ public class CustomUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         User user = userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
-        return org.springframework.security.core.userdetails.User.withUsername(user.getEmail())
-                .password(user.getPasswordHash())
-                .authorities(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
-                .disabled(user.getStatus() != UserStatus.ACTIVE)
-                .build();
+        if (user.getCredentialState() == CredentialState.LEGACY_UNVERIFIED
+                && !BCRYPT_HASH.matcher(user.getPasswordHash()).matches()) {
+            throw new BadCredentialsException("Credencial indisponível para validação segura");
+        }
+        return new AtlasUserDetails(user);
     }
 }

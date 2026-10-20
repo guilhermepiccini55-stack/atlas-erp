@@ -22,6 +22,17 @@ spring:
   flyway:
     enabled: true
     locations: ${FLYWAY_LOCATIONS:classpath:db/migration}
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${SMTP_AUTH:false}
+          starttls:
+            enable: ${SMTP_STARTTLS_ENABLE:true}
   data:
     web:
       pageable:
@@ -63,5 +74,11 @@ app:
     secret: ${JWT_SECRET}
     access-expiration-minutes: ${JWT_ACCESS_EXPIRATION_MINUTES:15}
     refresh-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS:7}
+  password-reset:
+    enabled: ${PASSWORD_RESET_ENABLED:false}
+    frontend-url: ${PASSWORD_RESET_FRONTEND_URL:}
+    from: ${PASSWORD_RESET_FROM:}
+    token-expiration-minutes: ${PASSWORD_RESET_TOKEN_EXPIRATION_MINUTES:15}
+    max-requests-per-hour: ${PASSWORD_RESET_MAX_REQUESTS_PER_HOUR:3}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}

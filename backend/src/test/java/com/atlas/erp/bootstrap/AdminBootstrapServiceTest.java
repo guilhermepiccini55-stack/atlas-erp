@@ -13,7 +13,7 @@ import com.atlas.erp.users.Role;
 import com.atlas.erp.users.UserRepository;
 import com.atlas.erp.users.UserService;
 import com.atlas.erp.users.UserStatus;
-import com.atlas.erp.users.dto.UserRequest;
+import com.atlas.erp.users.dto.UserCreateRequest;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
@@ -79,7 +79,7 @@ class AdminBootstrapServiceTest {
         InOrder order = inOrder(bootstrapLock, userRepository, userService);
         order.verify(bootstrapLock).acquire();
         order.verify(userRepository).countAllIncludingDeleted();
-        order.verify(userService).create(new UserRequest(
+        order.verify(userService).create(new UserCreateRequest(
                 "Initial Admin", "admin@example.test", "LongTestPass123", Role.ADMIN, UserStatus.ACTIVE));
     }
 
@@ -156,7 +156,7 @@ class AdminBootstrapServiceTest {
     void createFirstAdmin_whenUserCreationFailsPropagatesFailure() {
         when(userRepository.countAllIncludingDeleted()).thenReturn(0L);
         RuntimeException failure = new IllegalStateException("user creation failed");
-        org.mockito.Mockito.doThrow(failure).when(userService).create(any(UserRequest.class));
+        org.mockito.Mockito.doThrow(failure).when(userService).create(any(UserCreateRequest.class));
 
         RuntimeException thrown = assertThrows(
                 RuntimeException.class,

@@ -30,6 +30,9 @@ public class JwtService {
             throw new IllegalStateException(
                     "JWT_SECRET deve ter pelo menos 32 caracteres. Gere um com: openssl rand -base64 48");
         }
+        if (accessExpirationMinutes < 1) {
+            throw new IllegalStateException("JWT_ACCESS_EXPIRATION_MINUTES deve ser positivo");
+        }
         this.key = Keys.hmacShaKeyFor(bytes);
         this.accessTtl = Duration.ofMinutes(accessExpirationMinutes);
     }
@@ -40,6 +43,7 @@ public class JwtService {
                 .subject(user.getEmail())
                 .claim("uid", user.getId().toString())
                 .claim("role", user.getRole().name())
+                .claim("credential_version", user.getCredentialVersion())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(accessTtl)))
                 .signWith(key)
@@ -49,6 +53,15 @@ public class JwtService {
     /** Valida assinatura e expiração e devolve o e-mail (subject). Lança {@link JwtException} se inválido. */
     public String extractUsername(String token) {
         return parse(token).getSubject();
+    }
+
+    public long extractCredentialVersion(String token) {
+        Claims claims = parse(token);
+        Object claim = claims.get("credential_version");
+        if (!(claim instanceof Number version) || version.longValue() < 0) {
+            throw new JwtException("Token sem versão de credencial válida");
+        }
+        return version.longValue();
     }
 
     public long accessTtlSeconds() {

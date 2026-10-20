@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.sql.SQLException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -109,14 +110,28 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> handleIntegrity(DataIntegrityViolationException ex, HttpServletRequest request) {
-        log.warn("Violação de integridade: {}", ex.getMostSpecificCause().getMessage());
+        String sqlState = findSqlState(ex);
+        log.warn("Database integrity violation method={} path={} sqlState={}",
+                request.getMethod(), request.getRequestURI(), sqlState);
         return build(HttpStatus.CONFLICT, "A operação conflita com dados existentes (valor duplicado ou registro em uso).", request, null);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleUnexpected(Exception ex, HttpServletRequest request) {
-        log.error("Erro inesperado em {} {}", request.getMethod(), request.getRequestURI(), ex);
+        log.error("Unexpected request failure method={} path={} exceptionType={}",
+                request.getMethod(), request.getRequestURI(), ex.getClass().getSimpleName());
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "Erro interno. Tente novamente em instantes.", request, null);
+    }
+
+    private static String findSqlState(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof SQLException sqlException) {
+                return sqlException.getSQLState() == null ? "unknown" : sqlException.getSQLState();
+            }
+            current = current.getCause();
+        }
+        return "unknown";
     }
 
     private ResponseEntity<ApiError> build(HttpStatus status, String message, HttpServletRequest request, Map<String, String> errors) {

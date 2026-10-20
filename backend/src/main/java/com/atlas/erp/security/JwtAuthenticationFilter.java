@@ -10,10 +10,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -42,15 +42,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = header.substring(BEARER.length()).trim();
             try {
                 String username = jwtService.extractUsername(token);
+                long tokenVersion = jwtService.extractCredentialVersion(token);
                 UserDetails details = userDetailsService.loadUserByUsername(username);
-                if (details.isEnabled()) {
+                if (details instanceof AtlasUserDetails atlasDetails
+                        && atlasDetails.getCredentialVersion() == tokenVersion
+                        && details.isEnabled()) {
+                    atlasDetails.eraseCredentials();
                     var authentication = new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities());
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authentication);
+                } else {
+                    log.debug("JWT rejeitado: versão da credencial inválida");
                 }
-            } catch (JwtException | IllegalArgumentException | UsernameNotFoundException ex) {
+            } catch (JwtException | IllegalArgumentException | AuthenticationException ex) {
                 // Token inválido/expirado ou usuário removido: segue sem autenticar (o entry point responde 401).
-                log.debug("JWT rejeitado: {}", ex.getMessage());
+                log.debug("JWT rejeitado: token inválido ou usuário não autenticável");
             }
         }
         chain.doFilter(request, response);

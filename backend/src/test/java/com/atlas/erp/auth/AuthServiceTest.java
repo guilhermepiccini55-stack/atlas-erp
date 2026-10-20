@@ -19,7 +19,6 @@ import com.atlas.erp.users.UserStatus;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -51,7 +50,7 @@ class AuthServiceTest {
         authService = new AuthService(authenticationManager, userRepository, refreshTokenRepository,
                 jwtService, new UserMapper(), 7);
         user = new User("Maria Teste", "maria@atlaserp.com", "hash", Role.MANAGER, UserStatus.ACTIVE);
-        ReflectionTestUtils.setField(user, "id", UUID.randomUUID());
+        ReflectionTestUtils.setField(user, "id", 42L);
     }
 
     @Test

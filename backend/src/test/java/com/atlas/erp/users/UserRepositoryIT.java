@@ -20,6 +20,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.test.context.ActiveProfiles;
+import org.flywaydb.core.Flyway;
 
 /** Roda as migrations Flyway num PostgreSQL real (Testcontainers) e valida mapeamento, auditoria e soft delete. */
 @DataJpaTest
@@ -32,6 +33,8 @@ class UserRepositoryIT extends PostgresTestContainer {
     private UserRepository userRepository;
     @Autowired
     private EntityManager em;
+    @Autowired
+    private Flyway flyway;
 
     private static String unique() {
         return UUID.randomUUID().toString().substring(0, 8);
@@ -50,6 +53,13 @@ class UserRepositoryIT extends PostgresTestContainer {
         assertThat(saved.getCreatedAt()).isNotNull();
         assertThat(saved.getUpdatedAt()).isNotNull();
         assertThat(saved.getCreatedBy()).isEqualTo("system");
+        assertThat(saved.getCredentialVersion()).isZero();
+    }
+
+    @Test
+    void flywayInitializesSchemaThroughVersionSix() {
+        assertThat(flyway.info().current()).isNotNull();
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("6");
     }
 
     @Test
@@ -65,7 +75,7 @@ class UserRepositoryIT extends PostgresTestContainer {
     @Test
     void delete_isSoft_rowRemainsButIsHiddenFromQueries() {
         User saved = userRepository.saveAndFlush(newUser(unique(), "Soft Delete", Role.EMPLOYEE, UserStatus.ACTIVE));
-        UUID id = saved.getId();
+        Long id = saved.getId();
 
         userRepository.delete(saved);
         userRepository.flush();

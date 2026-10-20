@@ -3,14 +3,18 @@ package com.atlas.erp.users;
 import com.atlas.erp.common.exception.BusinessException;
 import com.atlas.erp.common.exception.ResourceNotFoundException;
 import com.atlas.erp.common.spec.SpecificationBuilder;
+import com.atlas.erp.auth.RefreshTokenRepository;
+import com.atlas.erp.users.dto.AdminPasswordChangeRequest;
 import com.atlas.erp.users.dto.ChangePasswordRequest;
 import com.atlas.erp.users.dto.UpdateProfileRequest;
+import com.atlas.erp.users.dto.UserCreateRequest;
 import com.atlas.erp.users.dto.UserRequest;
 import com.atlas.erp.users.dto.UserResponse;
 import com.atlas.erp.users.dto.UserStatsResponse;
 import com.atlas.erp.users.dto.UserStatsResponse.Kpi;
 import com.atlas.erp.users.dto.UserStatsResponse.MonthPoint;
 import com.atlas.erp.users.dto.UserStatsResponse.RoleShare;
+import com.atlas.erp.users.CredentialState;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
@@ -20,7 +24,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -32,17 +37,27 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class UserService {
 
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
     private static final Set<String> SORTABLE_FIELDS = Set.of("name", "email", "role", "status", "createdAt");
     private static final int STATS_MONTHS = 6;
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final AdminPasswordChangeAuditRepository adminPasswordChangeAuditRepository;
 
-    public UserService(UserRepository userRepository, UserMapper userMapper, PasswordEncoder passwordEncoder) {
+    public UserService(
+            UserRepository userRepository,
+            UserMapper userMapper,
+            PasswordEncoder passwordEncoder,
+            RefreshTokenRepository refreshTokenRepository,
+            AdminPasswordChangeAuditRepository adminPasswordChangeAuditRepository) {
         this.userRepository = userRepository;
         this.userMapper = userMapper;
         this.passwordEncoder = passwordEncoder;
+        this.refreshTokenRepository = refreshTokenRepository;
+        this.adminPasswordChangeAuditRepository = adminPasswordChangeAuditRepository;
     }
 
     @Transactional(readOnly = true)
@@ -57,12 +72,12 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public UserResponse get(UUID id) {
+    public UserResponse get(Long id) {
         return userMapper.toResponse(findOrThrow(id));
     }
 
     @Transactional
-    public UserResponse create(UserRequest request) {
+    public UserResponse create(UserCreateRequest request) {
         if (request.password() == null || request.password().isBlank()) {
             throw new BusinessException("Informe uma senha com pelo menos 8 caracteres para criar o usuário.", HttpStatus.BAD_REQUEST);
         }
@@ -80,7 +95,7 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponse update(UUID id, UserRequest request, String actingEmail) {
+    public UserResponse update(Long id, UserRequest request, String actingEmail) {
         User user = findOrThrow(id);
         String email = normalizeEmail(request.email());
         if (userRepository.existsByEmailIgnoreCaseAndIdNot(email, id)) {
@@ -95,14 +110,37 @@ public class UserService {
         user.setEmail(email);
         user.setRole(request.role());
         user.setStatus(newStatus);
-        if (request.password() != null && !request.password().isBlank()) {
-            user.setPasswordHash(passwordEncoder.encode(request.password()));
-        }
         return userMapper.toResponse(userRepository.save(user));
     }
 
     @Transactional
-    public void delete(UUID id, String actingEmail) {
+    public void changePasswordAsAdmin(Long id, AdminPasswordChangeRequest request, String actorEmail) {
+        User actor = findByEmailOrThrow(actorEmail);
+        if (actor.getRole() != Role.ADMIN) {
+            throw new BusinessException(
+                    "Você não tem permissão para alterar senhas de outros usuários.", HttpStatus.FORBIDDEN);
+        }
+
+        User target = findOrThrow(id);
+        if (target.getRole() == Role.ADMIN) {
+            throw new BusinessException(
+                    "A alteração administrativa de senha de contas ADMIN não está habilitada.", HttpStatus.FORBIDDEN);
+        }
+
+        target.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        target.setCredentialState(CredentialState.BCRYPT);
+        target.incrementCredentialVersion();
+        userRepository.save(target);
+        refreshTokenRepository.revokeAllByUserId(target.getId());
+        adminPasswordChangeAuditRepository.save(
+                new AdminPasswordChangeAudit(actor.getId(), target.getId(), request.reason()));
+
+        log.info("Administrative password change actorId={} targetId={} reason={}",
+                actor.getId(), target.getId(), request.reason());
+    }
+
+    @Transactional
+    public void delete(Long id, String actingEmail) {
         User user = findOrThrow(id);
         if (user.getEmail().equalsIgnoreCase(actingEmail)) {
             throw new BusinessException("Você não pode excluir a própria conta.");
@@ -132,7 +170,10 @@ public class UserService {
             throw new BusinessException("A nova senha deve ser diferente da atual.", HttpStatus.BAD_REQUEST);
         }
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        user.setCredentialState(CredentialState.BCRYPT);
+        user.incrementCredentialVersion();
         userRepository.save(user);
+        refreshTokenRepository.revokeAllByUserId(user.getId());
     }
 
     /**
@@ -208,7 +249,7 @@ public class UserService {
         return month.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
     }
 
-    private User findOrThrow(UUID id) {
+    private User findOrThrow(Long id) {
         return userRepository.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Usuário", id));
     }
 

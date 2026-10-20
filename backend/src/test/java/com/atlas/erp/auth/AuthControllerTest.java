@@ -17,7 +17,6 @@ import com.atlas.erp.users.Role;
 import com.atlas.erp.users.UserStatus;
 import com.atlas.erp.users.dto.UserResponse;
 import java.time.Instant;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -49,7 +48,7 @@ class AuthControllerTest {
 
     @Test
     void login_withValidBody_returnsTokens() throws Exception {
-        UserResponse user = new UserResponse(UUID.randomUUID(), "Admin", "admin@atlaserp.com",
+        UserResponse user = new UserResponse(1L, "Admin", "admin@atlaserp.com",
                 Role.ADMIN, UserStatus.ACTIVE, Instant.now(), Instant.now());
         when(authService.login(any())).thenReturn(new LoginResponse("acc", "ref", "Bearer", 900, user));
 

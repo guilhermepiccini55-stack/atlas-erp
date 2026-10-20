@@ -5,6 +5,7 @@ import com.atlas.erp.auth.dto.LoginResponse;
 import com.atlas.erp.common.exception.BusinessException;
 import com.atlas.erp.security.JwtService;
 import com.atlas.erp.users.User;
+import com.atlas.erp.users.CredentialState;
 import com.atlas.erp.users.UserMapper;
 import com.atlas.erp.users.UserRepository;
 import com.atlas.erp.users.UserStatus;
@@ -48,6 +49,9 @@ public class AuthService {
         this.refreshTokenRepository = refreshTokenRepository;
         this.jwtService = jwtService;
         this.userMapper = userMapper;
+        if (refreshExpirationDays < 1) {
+            throw new IllegalStateException("JWT_REFRESH_EXPIRATION_DAYS deve ser positivo");
+        }
         this.refreshTtl = Duration.ofDays(refreshExpirationDays);
     }
 
@@ -58,6 +62,10 @@ public class AuthService {
         authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(email, request.password()));
         User user = userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> invalidSession());
+        if (user.getCredentialState() == CredentialState.LEGACY_UNVERIFIED) {
+            user.setCredentialState(CredentialState.BCRYPT);
+            userRepository.save(user);
+        }
         return issueTokens(user);
     }
 

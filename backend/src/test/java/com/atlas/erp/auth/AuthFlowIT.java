@@ -10,9 +10,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.atlas.erp.support.PostgresTestContainer;
 import com.atlas.erp.users.Role;
+import com.atlas.erp.users.CredentialState;
 import com.atlas.erp.users.User;
 import com.atlas.erp.users.UserRepository;
 import com.atlas.erp.users.UserStatus;
+import com.atlas.erp.users.dto.AdminPasswordChangeReason;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
@@ -105,6 +107,44 @@ class AuthFlowIT extends PostgresTestContainer {
     }
 
     @Test
+    void recognizedLegacyBcryptCanLoginAndIsMarkedAsVerified() throws Exception {
+        String email = "legacy-bcrypt." + UUID.randomUUID().toString().substring(0, 8) + "@atlaserp.com";
+        User user = new User(
+                "Legacy BCrypt", email, passwordEncoder.encode(PASSWORD), Role.GUEST, UserStatus.ACTIVE);
+        user.setCredentialState(CredentialState.LEGACY_UNVERIFIED);
+        userRepository.saveAndFlush(user);
+
+        postJson("/auth/login", Map.of("email", email, "password", PASSWORD), 200, null);
+
+        assertThat(userRepository.findByEmailIgnoreCase(email).orElseThrow().getCredentialState())
+                .isEqualTo(CredentialState.BCRYPT);
+    }
+
+    @Test
+    void unrecognizedLegacyCredentialIsPreservedAndNeverComparedAsPlainText() throws Exception {
+        String legacyValue = "legacy-value-not-a-bcrypt-hash";
+        String email = "legacy-unknown." + UUID.randomUUID().toString().substring(0, 8) + "@atlaserp.com";
+        User user = new User("Legacy Unknown", email, legacyValue, Role.GUEST, UserStatus.ACTIVE);
+        user.setCredentialState(CredentialState.LEGACY_UNVERIFIED);
+        user = userRepository.saveAndFlush(user);
+        Long id = user.getId();
+
+        postJson("/auth/login", Map.of("email", email, "password", legacyValue), 401, null);
+
+        User unchanged = userRepository.findById(id).orElseThrow();
+        assertThat(unchanged.getPasswordHash()).isEqualTo(legacyValue);
+        assertThat(unchanged.getCredentialState()).isEqualTo(CredentialState.LEGACY_UNVERIFIED);
+    }
+
+    @Test
+    void passwordResetEndpointsAreUnavailableUntilExplicitlyEnabled() throws Exception {
+        mockMvc.perform(post("/auth/password-reset/request")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("email", "user@example.test"))))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void pendingUserCannotLogin() throws Exception {
         String email = createUser(Role.EMPLOYEE, UserStatus.PENDING);
 
@@ -170,7 +210,7 @@ class AuthFlowIT extends PostgresTestContainer {
                 .andExpect(status().isNotFound());
 
         // não pode excluir a si mesmo
-        UUID selfId = userRepository.findByEmailIgnoreCase(adminEmail).orElseThrow().getId();
+        Long selfId = userRepository.findByEmailIgnoreCase(adminEmail).orElseThrow().getId();
         mockMvc.perform(delete("/users/{id}", selfId).header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isUnprocessableEntity());
     }
@@ -178,7 +218,9 @@ class AuthFlowIT extends PostgresTestContainer {
     @Test
     void userCanChangeOwnPassword() throws Exception {
         String email = createUser(Role.VIEWER, UserStatus.ACTIVE);
-        String token = login(email).get("accessToken").asText();
+        JsonNode session = login(email);
+        String token = session.get("accessToken").asText();
+        String refreshToken = session.get("refreshToken").asText();
 
         mockMvc.perform(put("/users/me/password")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -188,5 +230,42 @@ class AuthFlowIT extends PostgresTestContainer {
 
         postJson("/auth/login", Map.of("email", email, "password", PASSWORD), 401, null);
         postJson("/auth/login", Map.of("email", email, "password", "NewSecret456"), 200, null);
+        postJson("/auth/refresh", Map.of("refreshToken", refreshToken), 401, null);
+        mockMvc.perform(get("/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void adminPasswordChangeInvalidatesTargetSessionsWithoutChangingProfileFields() throws Exception {
+        String adminEmail = createUser(Role.ADMIN, UserStatus.ACTIVE);
+        String adminToken = login(adminEmail).get("accessToken").asText();
+        String targetEmail = createUser(Role.EMPLOYEE, UserStatus.ACTIVE);
+        JsonNode targetSession = login(targetEmail);
+        String targetAccessToken = targetSession.get("accessToken").asText();
+        String targetRefreshToken = targetSession.get("refreshToken").asText();
+        User target = userRepository.findByEmailIgnoreCase(targetEmail).orElseThrow();
+        Long targetId = target.getId();
+        String targetRole = target.getRole().name();
+        String targetStatus = target.getStatus().name();
+        String newPassword = "AdminSetSecret456";
+
+        mockMvc.perform(put("/users/{id}/password", targetId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "newPassword", newPassword,
+                                "reason", AdminPasswordChangeReason.SECURITY_CONCERN.name()))))
+                .andExpect(status().isNoContent());
+
+        User updated = userRepository.findById(targetId).orElseThrow();
+        assertThat(updated.getEmail()).isEqualTo(targetEmail);
+        assertThat(updated.getRole().name()).isEqualTo(targetRole);
+        assertThat(updated.getStatus().name()).isEqualTo(targetStatus);
+        assertThat(updated.getCredentialVersion()).isEqualTo(1);
+        postJson("/auth/login", Map.of("email", targetEmail, "password", PASSWORD), 401, null);
+        postJson("/auth/login", Map.of("email", targetEmail, "password", newPassword), 200, null);
+        postJson("/auth/refresh", Map.of("refreshToken", targetRefreshToken), 401, null);
+        mockMvc.perform(get("/users/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + targetAccessToken))
+                .andExpect(status().isUnauthorized());
     }
 }

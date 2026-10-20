@@ -2,15 +2,17 @@ package com.atlas.erp.users;
 
 import com.atlas.erp.common.PageResponse;
 import com.atlas.erp.users.dto.ChangePasswordRequest;
+import com.atlas.erp.users.dto.AdminPasswordChangeRequest;
 import com.atlas.erp.users.dto.UpdateProfileRequest;
+import com.atlas.erp.users.dto.UserCreateRequest;
 import com.atlas.erp.users.dto.UserRequest;
 import com.atlas.erp.users.dto.UserResponse;
 import com.atlas.erp.users.dto.UserStatsResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import java.net.URI;
-import java.util.UUID;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -76,29 +78,45 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
+    @PutMapping("/{id}/password")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Altera a senha de um usuário não administrador")
+    public ResponseEntity<Void> changePasswordAsAdmin(
+            @PathVariable @Parameter(description = "ID numérico BIGINT do usuário") Long id,
+            @Valid @RequestBody AdminPasswordChangeRequest request,
+            Authentication authentication) {
+        userService.changePasswordAsAdmin(id, request, authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
-    public UserResponse get(@PathVariable UUID id) {
+    public UserResponse get(@PathVariable @Parameter(description = "ID numérico BIGINT do usuário") Long id) {
         return userService.get(id);
     }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<UserResponse> create(@Valid @RequestBody UserRequest request) {
+    public ResponseEntity<UserResponse> create(@Valid @RequestBody UserCreateRequest request) {
         UserResponse created = userService.create(request);
         return ResponseEntity.created(URI.create("/users/" + created.id())).body(created);
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public UserResponse update(@PathVariable UUID id, @Valid @RequestBody UserRequest request, Authentication authentication) {
+    public UserResponse update(
+            @PathVariable @Parameter(description = "ID numérico BIGINT do usuário") Long id,
+            @Valid @RequestBody UserRequest request,
+            Authentication authentication) {
         return userService.update(id, request, authentication.getName());
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Exclui o usuário (exclusão lógica)")
-    public ResponseEntity<Void> delete(@PathVariable UUID id, Authentication authentication) {
+    public ResponseEntity<Void> delete(
+            @PathVariable @Parameter(description = "ID numérico BIGINT do usuário") Long id,
+            Authentication authentication) {
         userService.delete(id, authentication.getName());
         return ResponseEntity.noContent().build();
     }

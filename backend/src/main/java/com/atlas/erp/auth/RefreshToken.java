@@ -19,7 +19,7 @@ public class RefreshToken {
     private UUID id;
 
     @Column(name = "user_id", nullable = false)
-    private UUID userId;
+    private Long userId;
 
     @Column(name = "token_hash", nullable = false, length = 64, unique = true)
     private String tokenHash;
@@ -36,7 +36,7 @@ public class RefreshToken {
     protected RefreshToken() {
     }
 
-    public RefreshToken(UUID userId, String tokenHash, Instant expiresAt) {
+    public RefreshToken(Long userId, String tokenHash, Instant expiresAt) {
         this.userId = userId;
         this.tokenHash = tokenHash;
         this.expiresAt = expiresAt;
@@ -46,7 +46,7 @@ public class RefreshToken {
         return id;
     }
 
-    public UUID getUserId() {
+    public Long getUserId() {
         return userId;
     }
 

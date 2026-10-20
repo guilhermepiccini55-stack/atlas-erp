@@ -4,7 +4,7 @@
 -- Login do administrador: admin@atlaserp.com
 -- ============================================================
 
-INSERT INTO users (name, email, password_hash, role, status, created_at, updated_at, created_by) VALUES
+INSERT INTO users (name, email, password, role, status, created_at, updated_at, created_by) VALUES
   ('Admin Atlas',      'admin@atlaserp.com',          '!DISABLED!', 'ADMIN',    'ACTIVE',  now() - interval '200 days', now(), 'system'),
   ('Lucas Ferreira',   'lucas.ferreira@atlaserp.com', '!DISABLED!', 'ADMIN',    'ACTIVE',  now() - interval '9 days',   now(), 'system'),
   ('Mariana Silva',    'mariana.silva@atlaserp.com',  '!DISABLED!', 'MANAGER',  'ACTIVE',  now() - interval '11 days',  now(), 'system'),
@@ -14,7 +14,7 @@ INSERT INTO users (name, email, password_hash, role, status, created_at, updated
   ('Isabela Rocha',    'isabela.rocha@atlaserp.com',  '!DISABLED!', 'EMPLOYEE', 'ACTIVE',  now() - interval '24 days',  now(), 'system');
 
 -- Usuários adicionais gerados de forma determinística, espalhados nos últimos ~6 meses
-INSERT INTO users (name, email, password_hash, role, status, created_at, updated_at, created_by)
+INSERT INTO users (name, email, password, role, status, created_at, updated_at, created_by)
 SELECT
     f.first_name || ' ' || l.last_name,
     lower(f.first_name || '.' || l.last_name || g.n) || '@atlaserp.com',

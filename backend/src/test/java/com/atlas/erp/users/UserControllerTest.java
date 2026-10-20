@@ -1,11 +1,13 @@
 package com.atlas.erp.users;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -15,9 +17,12 @@ import com.atlas.erp.config.SecurityConfig;
 import com.atlas.erp.security.CustomUserDetailsService;
 import com.atlas.erp.security.JwtService;
 import com.atlas.erp.users.dto.UserResponse;
+import com.atlas.erp.users.dto.UserRequest;
+import com.atlas.erp.users.dto.AdminPasswordChangeReason;
+import com.atlas.erp.users.dto.AdminPasswordChangeRequest;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -48,7 +53,7 @@ class UserControllerTest {
             """;
 
     private static UserResponse sample() {
-        return new UserResponse(UUID.randomUUID(), "Lucas Ferreira", "lucas@atlaserp.com",
+        return new UserResponse(42L, "Lucas Ferreira", "lucas@atlaserp.com",
                 Role.ADMIN, UserStatus.ACTIVE, Instant.now(), Instant.now());
     }
 
@@ -98,7 +103,7 @@ class UserControllerTest {
         mockMvc.perform(post("/users").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "/users/" + created.id()))
-                .andExpect(jsonPath("$.id").value(created.id().toString()));
+                .andExpect(jsonPath("$.id").value(created.id()));
     }
 
     @Test
@@ -124,12 +129,57 @@ class UserControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void delete_asAdmin_returns204() throws Exception {
-        UUID id = UUID.randomUUID();
+        Long id = 42L;
 
         mockMvc.perform(delete("/users/{id}", id))
                 .andExpect(status().isNoContent());
 
         verify(userService).delete(id, "user");
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void changePasswordAsAdmin_asAdminCallsDedicatedOperation() throws Exception {
+        mockMvc.perform(put("/users/{id}/password", 42L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"newPassword":"NewSecret123","reason":"USER_REQUEST"}
+                                """))
+                .andExpect(status().isNoContent());
+
+        verify(userService).changePasswordAsAdmin(
+                eq(42L),
+                eq(new AdminPasswordChangeRequest("NewSecret123", AdminPasswordChangeReason.USER_REQUEST)),
+                eq("user"));
+    }
+
+    @Test
+    @WithMockUser(roles = "MANAGER")
+    void changePasswordAsAdmin_asManagerReturns403() throws Exception {
+        mockMvc.perform(put("/users/{id}/password", 42L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"newPassword":"NewSecret123","reason":"USER_REQUEST"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void genericUpdateIgnoresPasswordFieldAndCannotSetCredential() throws Exception {
+        when(userService.update(eq(42L), any(UserRequest.class), eq("user"))).thenReturn(sample());
+
+        mockMvc.perform(put("/users/{id}", 42L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Updated","email":"updated@example.test","role":"EMPLOYEE",
+                                 "status":"ACTIVE","password":"ShouldNotBeUsed123"}
+                                """))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<UserRequest> captor = ArgumentCaptor.forClass(UserRequest.class);
+        verify(userService).update(eq(42L), captor.capture(), eq("user"));
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().name()).isEqualTo("Updated");
     }
 
     @Test
